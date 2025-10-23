@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Port Santai Di Highway</title>
+  <style>
+    :root{--accent:#0ea5a4;--bg:#f7fafc;--card:#ffffff}
+    *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{margin:0;background:var(--bg);padding:18px}
+    .wrap{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:18px}
+    header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    h1{font-size:20px;margin:0}
+    .menu{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06)}
+    .items{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    .item{padding:10px;border:1px dashed #e6eef0;border-radius:8px;display:flex;flex-direction:column;gap:8px}
+    .item .name{font-weight:600}
+    .item .price{font-size:14px;color:#6b7280}
+    .item .controls{display:flex;gap:8px;align-items:center}
+    .btn{background:var(--accent);color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .small{padding:6px 8px;font-size:13px}
+    .order{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 6px 18px rgba(2,6,23,0.06);display:flex;flex-direction:column}
+    .order-list{min-height:120px;border:1px solid #eef2f2;padding:8px;border-radius:8px;margin-bottom:8px;overflow:auto}
+    .order-row{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px dashed #f1f5f5}
+    .totals{margin-top:8px}
+    .totals div{display:flex;justify-content:space-between;padding:6px 0}
+    .controls-row{display:flex;gap:8px;margin-top:10px}
+    input[type=number], input[type=text]{padding:8px;border-radius:8px;border:1px solid #e6eef0;width:100%}
+    .hidden-print{display:block}
+    /* Print styles */
+    @media print{
+      body *{visibility:hidden}
+      #printArea, #printArea *{visibility:visible}
+      #printArea{position:fixed;left:0;top:0;width:100%}
+    }
+    /* responsive */
+    @media (max-width:960px){.wrap{grid-template-columns:1fr;}.hidden-print{display:none}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Simple Restaurant POS</h1>
+      <div style="font-size:13px;color:#374151">Customer Order</div>
+    </header>
+
+    <section class="menu">
+      <h3 style="margin-top:0">Menu</h3>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="search" placeholder="Search menu..." type="text" />
+        <button class="btn small" onclick="resetMenu()">Reset</button>
+      </div>
+      <div class="items" id="menuItems"></div>
+    </section>
+
+    <aside class="order">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>Current Order</strong>
+        <div style="font-size:13px;color:#6b7280">Items: <span id="itemCount">0</span></div>
+      </div>
+
+      <div class="order-list" id="orderList"></div>
+
+      <div class="totals">
+        <div><span>Subtotal</span><strong>RM <span id="subtotal">0.00</span></strong></div>
+        <div><span>Tax (6%)</span><strong>RM <span id="tax">0.00</span></strong></div>
+        <div><span>Service (0%)</span><strong>RM <span id="service">0.00</span></strong></div>
+        <div style="border-top:1px solid #eef2f2;padding-top:8px"><span>Total</span><strong>RM <span id="total">0.00</span></strong></div>
+      </div>
+
+      <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input type="number" id="discount" placeholder="Discount (RM)" min="0" step="0.01" />
+        <input type="number" id="paid" placeholder="Cash paid (RM)" min="0" step="0.01" />
+      </div>
+
+      <div class="controls-row hidden-print">
+        <button class="btn" onclick="printReceipt()">Print</button>
+        <button class="btn small" style="background:#ef4444" onclick="clearOrder()">Clear</button>
+      </div>
+
+      <div style="margin-top:8px;font-size:13px;color:#6b7280">Tip: Click an item to add 1 Ã¢â‚¬â€ use quantity controls inside the order to adjust.</div>
+    </aside>
+
+    <!-- Hidden printable area -->
+    <div id="printArea" style="display:none;padding:18px;background:#fff;margin-top:14px;border-radius:6px">
+      <div style="text-align:center;margin-bottom:6px">
+        <h2 style="margin:0">My Restaurant</h2>
+        <div style="font-size:12px">Receipt</div>
+      </div>
+      <div id="printContent"></div>
+      <div style="margin-top:10px;text-align:right;font-weight:600">Grand Total: RM <span id="printTotal">0.00</span></div>
+      <div style="margin-top:10px;font-size:12px">Thank you for dining with us!</div>
+    </div>
+  </div>
+
+  <script>
+    // Sample menu data - modify/extend as needed
+    const MENU = [
+      {id:1, name:'Cheeseburger', price:8.50},
+      {id:2, name:'Chicken Burger', price:7.50},
+      {id:3, name:'Fries (Large)', price:4.00},
+      {id:4, name:'Coke (330ml)', price:2.50},
+      {id:5, name:'Nasi Lemak', price:6.50},
+      {id:6, name:'Fried Rice', price:5.50},
+      {id:7, name:'Coffee', price:3.00},
+      {id:8, name:'Tea', price:2.00},
+	  {id:9, name:'burger', price:3.00}
+    ];
+
+    let order = {}; // {id: {id,name,price,qty}}
+    const TAX_RATE = 0.06;
+    const SERVICE_RATE = 0.00; // change if you want service charge
+
+    const menuEl = document.getElementById('menuItems');
+    const orderListEl = document.getElementById('orderList');
+    const subtotalEl = document.getElementById('subtotal');
+    const taxEl = document.getElementById('tax');
+    const serviceEl = document.getElementById('service');
+    const totalEl = document.getElementById('total');
+    const itemCountEl = document.getElementById('itemCount');
+
+    function format(n){return Number(n).toFixed(2)}
+
+    function renderMenu(items=MENU){
+      menuEl.innerHTML='';
+      items.forEach(it=>{
+        const div = document.createElement('div'); div.className='item';
+        div.innerHTML = `<div class="name">${it.name}</div><div class="price">RM ${format(it.price)}</div>`;
+        const controls = document.createElement('div'); controls.className='controls';
+        const addBtn = document.createElement('button'); addBtn.className='btn small'; addBtn.textContent='Add';
+        addBtn.onclick = ()=> addToOrder(it.id);
+        controls.appendChild(addBtn);
+        div.appendChild(controls);
+        menuEl.appendChild(div);
+      });
+    }
+
+    function resetMenu(){
+      document.getElementById('search').value=''; renderMenu();
+    }
+
+    document.getElementById('search').addEventListener('input', (e)=>{
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = MENU.filter(m=>m.name.toLowerCase().includes(q));
+      renderMenu(filtered);
+    });
+
+    function addToOrder(id, qty=1){
+      const item = MENU.find(m=>m.id===id);
+      if(!item) return;
+      if(order[id]) order[id].qty += qty; else order[id] = {...item, qty: qty};
+      renderOrder();
+    }
+
+    function changeQty(id, qty){
+      if(!order[id]) return;
+      order[id].qty = qty;
+      if(order[id].qty <=0) delete order[id];
+      renderOrder();
+    }
+
+    function removeItem(id){ delete order[id]; renderOrder(); }
+
+    function renderOrder(){
+      orderListEl.innerHTML = '';
+      const keys = Object.keys(order);
+      let subtotal = 0;
+      keys.forEach(k=>{
+        const it = order[k];
+        subtotal += it.price * it.qty;
+        const row = document.createElement('div'); row.className='order-row';
+        row.innerHTML = `<div style="flex:1"><div style="font-weight:600">${it.name}</div><div style="font-size:12px;color:#6b7280">RM ${format(it.price)} x ${it.qty}</div></div>`;
+        const actions = document.createElement('div'); actions.style.textAlign='right';
+        actions.innerHTML = `
+          <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
+            <button class="btn small" onclick="changeQty(${it.id}, ${it.qty - 1})">-</button>
+            <input type="number" min="0" step="1" value="${it.qty}" style="width:56px;padding:6px;border-radius:6px;border:1px solid #e6eef0" onchange="changeQty(${it.id}, parseInt(this.value) || 0)">
+            <button class="btn small" onclick="changeQty(${it.id}, ${it.qty + 1})">+</button>
+            <button class="btn small" style="background:#ef4444" onclick="removeItem(${it.id})">x</button>
+          </div>
+        `;
+        row.appendChild(actions);
+        orderListEl.appendChild(row);
+      });
+
+      const discount = parseFloat(document.getElementById('discount').value) || 0;
+      const tax = subtotal * TAX_RATE;
+      const service = subtotal * SERVICE_RATE;
+      const total = Math.max(0, subtotal + tax + service - discount);
+
+      subtotalEl.textContent = format(subtotal);
+      taxEl.textContent = format(tax);
+      serviceEl.textContent = format(service);
+      totalEl.textContent = format(total);
+
+      itemCountEl.textContent = keys.length;
+    }
+
+    function clearOrder(){
+      order = {};
+      document.getElementById('discount').value='';
+      document.getElementById('paid').value='';
+      renderOrder();
+    }
+
+    function printReceipt(){
+      // prepare print content
+      const printArea = document.getElementById('printArea');
+      const printContent = document.getElementById('printContent');
+      printContent.innerHTML = '';
+      let subtotal = 0;
+      Object.values(order).forEach(it=>{
+        const line = document.createElement('div');
+        line.style.display='flex'; line.style.justifyContent='space-between'; line.style.padding='4px 0';
+        line.innerHTML = `<div>${it.name} x ${it.qty}</div><div>RM ${format(it.price * it.qty)}</div>`;
+        printContent.appendChild(line);
+        subtotal += it.price * it.qty;
+      });
+      const discount = parseFloat(document.getElementById('discount').value) || 0;
+      const tax = subtotal * TAX_RATE;
+      const service = subtotal * SERVICE_RATE;
+      const total = Math.max(0, subtotal + tax + service - discount);
+
+      document.getElementById('printTotal').textContent = format(total);
+
+      // show print area and call print
+      printArea.style.display='block';
+      window.print();
+      // after print hide
+      setTimeout(()=>{ printArea.style.display='none'; }, 500);
+    }
+
+    // Initialize
+    renderMenu(); renderOrder();
+
+    // Keep totals live when discount / paid change
+    document.getElementById('discount').addEventListener('input', renderOrder);
+    document.getElementById('paid').addEventListener('input', ()=>{
+      const paid = parseFloat(document.getElementById('paid').value) || 0;
+      const total = parseFloat(document.getElementById('total').textContent) || 0;
+      // optional: show change
+      // (we'll append a small message below)
+      let changeEl = document.getElementById('changeMsg');
+      if(!changeEl){ changeEl = document.createElement('div'); changeEl.id='changeMsg'; changeEl.style.marginTop='8px'; changeEl.style.fontWeight='600'; document.querySelector('.order').appendChild(changeEl); }
+      changeEl.textContent = paid >= total ? `Change: RM ${format(paid - total)}` : `Due: RM ${format(Math.max(0, total - paid))}`;
+    });
+
+  </script>
+</body>
+</html>
